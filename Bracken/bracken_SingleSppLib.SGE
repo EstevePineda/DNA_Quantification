@@ -1,0 +1,48 @@
+#!/bin/bash
+
+#SBATCH --job-name=brackenSingleSpp
+#SBATCH --output=brackenSingleSpp.out
+#SBATCH --error=brackenSingleSpp.err
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=12
+#SBATCH -p nodo.q
+#SBATCH -w clus01
+
+
+
+#Software Kraken path
+KRAKEN2=/home/caos/bio-data/TOOLS/kraken2-2.0.8-beta/kraken2
+# Kraken DataBase path
+KRAKEN_DB=/home/pfc/epineda/TFG_Esteve/bracken/Kraken
+
+BRACKEN=/home/pfc/epineda/TFG_Esteve/bracken/Bracken/bracken
+
+LEVEL=S #O = Order, F = Family, G = Genus...
+THRESHOLD=10
+READ_LEN=150
+
+
+
+
+for perc in 75 25; do
+	export perc
+	SAMPLE_PATH=/home/caos/bio-data/DATA/single_spp_lib/${perc}/SE_trim_len150_minlen140
+	for lib in 0-PM 1-DV 2-DMe 3-DMo 4-BO 5-LH 6-AE 7-BT 8-AM 9-AP 10-ACo 11-BTa 12-CL 13-DMe 14-DMo 15-DV 16-DSu 17-LH 18-PXy 19-SI 20-VE 21-WA; do
+	time {
+		file2map=${SAMPLE_PATH}/${lib}-R1_trim-${perc}.fastq
+		cd /home/pfc/epineda/TFG_Esteve/bracken_tests/BrackenSingleSpp
+
+		time ${KRAKEN2} --DB ${KRAKEN_DB} $file2map --output ${lib}-R1_trim-${perc}.kraken --report ${lib}-R1_trim-${perc}.report
+		reportFile=${lib}-R1_trim-${perc}.report
+
+		OUTPUT=/home/pfc/epineda/TFG_Esteve/bracken_tests/BrackenSingleSpp/${lib}-R1_trim-${perc}.bracken
+
+		time ${BRACKEN} -d ${KRAKEN_DB} -i ${reportFile} -o ${OUTPUT} -r ${READ_LEN} -l ${LEVEL} -t ${THRESHOLD}	
+	}
+	
+	done
+done
+
+
+

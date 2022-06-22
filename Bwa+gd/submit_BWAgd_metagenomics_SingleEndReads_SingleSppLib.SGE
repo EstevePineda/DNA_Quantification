@@ -1,0 +1,73 @@
+#!/bin/bash
+#SBATCH --job-name=MG-Bwa-gd
+#SBATCH --output=bwa_gd_Single.out
+#SBATCH --error=bwa_gd_Single.err
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=12
+#SBATCH -p nodo.q
+#SBATCH -w clus12
+
+
+export k=19 #$1 #k is 19 by default
+export T=30 #$2 #T is 30 by default
+
+#===========================================================================
+# Mito reads (training or test dataset) against Masked mitogenomes
+#===========================================================================
+
+echo "----------------------------------------------------------------------"
+echo "Let's play metagenomics using as input data:"
+echo " - SAMPLE: "
+echo "   + Single species samples"
+echo "      + first 75% of the original sample (training dataset) and last 25% of the original sample (test dataset)"
+echo "   + Single-end reads" 
+echo " - REFERENCES: Whole genomes"
+echo "----------------------------------------------------------------------"
+
+
+REF_PATH=/home/caos/bio-data/DATA/whole_genomes
+BWA_INDEX=/home/caos/bio-data/DATA/whole_genomes/BWA_index
+
+mkdir -p /tmp/epineda/bio-data/workdirSingleSppOriginal/ 
+WK_DIR=/tmp/epineda/bio-data/workdirSingleSppOriginal 
+
+cd ${WK_DIR}
+cp ${BWA_INDEX}/*.fasta.* ${WK_DIR}/.
+
+
+for perc in 75 25; do #NEW: Bucle per tractar el training dataset (75%) i el test dataset (25%), amb això tractem totes les mostres single-species
+	export perc
+
+	# Now we loop through the 22 single species samples and map each of them against all 110 whole genomes
+	for lib in 0-PM 1-DV 2-DMe 3-DMo 4-BO 5-LH 6-AE 7-BT 8-AM 9-AP 10-ACo 11-BTa 12-CL 13-DMe 14-DMo 15-DV 16-DSu 17-LH 18-PXy 19-SI 20-VE 21-WA; do
+	time {
+		SAMPLE_PATH=/home/caos/bio-data/DATA/single_spp_lib/${perc}/SE_trim_len150_minlen140
+
+	        OUTPUT_PATH=/home/pfc/epineda/TFG_Esteve/bio-data/OUTPUT/BWA/SingleEnd_AllReads/SingleSppLib_${perc}_Original/WholeGenomes/k${k}_T${T}/${lib} #NEW
+        	gd_OUTPUT_PATH=/home/pfc/epineda/TFG_Esteve/bio-data/OUTPUT/g-d_algorithm/SingleEnd_AllReads/SingleSppLib_${perc}_Original/WholeGenomes/${lib}       #NEW: sembla ser el path per guardar la sortida de l'algorisme gamma-delta
+
+		mkdir -p $OUTPUT_PATH
+		mkdir -p $gd_OUTPUT_PATH
+
+		ls -d *fasta* | cut -d"." -f1 | uniq | while read -r genome; do
+			echo "Mapping " $lib " to reference " $genome
+			echo "Mapping " $lib " to reference " $genome >&2
+		
+			echo "Time consumed by BWA" >&2
+			time /home/caos/bio-data/TOOLS/bwa-0.7.15/bwa mem -k ${k} -T ${T} -t 12 ${genome}.fasta ${SAMPLE_PATH}/${lib}-R1_trim-${perc}.fastq > ${WK_DIR}/map_file.sam #BWA: eina per mapejar els reads d'entrada amb els genomes de referència
+		
+			echo "Time consumed by SAMTools" >&2
+			time /home/caos/bio-data/TOOLS/samtools-1.10/samtools view -t 12 -F2308 ${WK_DIR}/map_file.sam > ${OUTPUT_PATH}/${genome}_${lib}-${perc}_F2308.sam #SAMTools: eina per eliminar els reads que no s'han mapejat sobre cap referència
+			rm ${WK_DIR}/map_file.sam
+		done
+
+		echo "Let's assign reads to species with the gamma-delta algorithm!"
+		echo "Let's assign reads to species with the gamma-delta algorithm!">&2
+        	echo "Time consumed by the g-d algorithm">&2
+		time /home/caos/bio-data/TOOLS/Python-3.7.9/python /home/caos/bio-data/TOOLS/g-d_algorithm/g-d_algorithm_3.6.py -r ${SAMPLE_PATH}/${lib}-R1_trim-${perc}.fastq -g 0.99 -d 0.98 -m ${OUTPUT_PATH}/ -o ${gd_OUTPUT_PATH}/BWA-k${k}-T${T}_g0.99-d0.98_SingleSppLib${lib}-${perc}.csv
+	}
+	done
+done
+
+rm ${WK_DIR}/*fasta*

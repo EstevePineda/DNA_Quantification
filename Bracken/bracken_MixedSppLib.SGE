@@ -1,0 +1,39 @@
+#!/bin/bash
+
+#SBATCH --job-name=brackenMixedSpp
+#SBATCH --output=brackenMixedSpp.out
+#SBATCH --error=brackenMixedSpp.err
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=12
+#SBATCH -p nodo.q
+#SBATCH -w clus01
+
+
+
+#Software Kraken path
+KRAKEN2=/home/caos/bio-data/TOOLS/kraken2-2.0.8-beta/kraken2
+# Kraken DataBase path
+KRAKEN_DB=/home/pfc/epineda/TFG_Esteve/bracken/Kraken
+
+
+BRACKEN=/home/pfc/epineda/TFG_Esteve/bracken/Bracken/bracken
+
+LEVEL=S #O = Order, F = Family, G = Genus...
+THRESHOLD=10
+READ_LEN=150
+
+SAMPLE_PATH=/home/caos/bio-data/DATA/mixed_spp_lib/SE_trim_len150_minlen140
+for lib in {1..6}; do #NEW
+time {
+	file2map=${SAMPLE_PATH}/MixedSppLib${lib}-R1_trim.fastq
+	cd /home/pfc/epineda/TFG_Esteve/bracken_tests/BrackenMixedSpp
+
+	time ${KRAKEN2} --DB ${KRAKEN_DB} $file2map --output MixedSppLib${lib}-R1_trim.kraken --report MixedSppLib${lib}-R1_trim.report
+	reportFile=MixedSppLib${lib}-R1_trim.report
+
+	OUTPUT=/home/pfc/epineda/TFG_Esteve/bracken_tests/BrackenMixedSpp/MixedSppLib${lib}-R1_trim.bracken
+
+	time ${BRACKEN} -d ${KRAKEN_DB} -i ${reportFile} -o ${OUTPUT} -r ${READ_LEN} -l ${LEVEL} -t ${THRESHOLD}	
+}
+done

@@ -1,0 +1,2 @@
+L'script que es troba en aquest directori és un exemple de l'script que s'ha utilitzat per a cada llibreria Mixed Species per tal d'obtenir l'abundància a la sortida
+de l'algorisme Kraken5G + BWA + gd.
